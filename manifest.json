@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Horas semanales",
+  "version": "2.5",
+  "permissions": ["storage", "alarms", "notifications", "scripting"],
+  "host_permissions": ["https://*.workers.dev/*"],
+  "optional_host_permissions": ["https://*/*"],
+  "icons": { "128": "icon.png" },
+  "background": { "service_worker": "background.js" },
+  "web_accessible_resources": [
+    {
+      "resources": ["media/*"],
+      "matches": ["https://*/*"]
+    }
+  ],
+  "action": { "default_popup": "popup.html" }
+}

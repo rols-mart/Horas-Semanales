@@ -1,0 +1,6 @@
+name = "horas-llegada"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+TZ = "America/Chihuahua"

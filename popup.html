@@ -1,0 +1,66 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  body { width: 340px; margin: 10px; font: 14px sans-serif; }
+  fieldset { margin: 0 0 10px; padding: 4px 10px 10px; }
+  legend { font-weight: bold; }
+  label { display: block; margin-top: 6px; }
+  input:not([type="radio"]), select { width: 100%; box-sizing: border-box; }
+  small { color: #555; }
+  .option b { font-weight: bold; }
+</style>
+<body>
+  <fieldset>
+    <legend>General</legend>
+    <label>Perfil
+      <select id="profile">
+        <option value="normal">Normal</option>
+        <option value="axel">Axel mode</option>
+        <option value="tazuki">Tazuki mode</option>
+      </select>
+    </label>
+    <label>Sitio del reporte (dominio)
+      <input id="host" placeholder="reportes.miempresa.com">
+    </label>
+    <button id="allow" type="button" style="margin-top:6px">Permitir en este sitio</button>
+    <small id="host-status" style="display:block;margin-top:4px"></small>
+  </fieldset>
+
+  <fieldset>
+    <legend>Objetivo semanal</legend>
+    <label>Meta semanal (horas)
+      <input id="target" type="number" min="1" step="0.5">
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Objetivo diario</legend>
+    <small>Qué pasa con los días siguientes cuando un día queda corto o te pasas:</small>
+    <label class="option">
+      <input type="radio" name="goalMode" value="spread"> <b>Repartir entre los días restantes</b><br>
+      <small id="ex-spread"></small>
+    </label>
+    <label class="option">
+      <input type="radio" name="goalMode" value="next"> <b>Pasar al día siguiente</b><br>
+      <small id="ex-next"></small>
+    </label>
+    <small style="display:block;margin-top:6px">
+      El último día los dos dan lo mismo: lo que falte para la meta semanal.
+    </small>
+  </fieldset>
+
+  <fieldset>
+    <legend>Registro hora de llegada</legend>
+    <small>Para marcar la llegada desde el celular con un Worker de Cloudflare.</small>
+    <label>Endpoint del celular
+      <input id="endpoint" placeholder="https://xxx.workers.dev">
+    </label>
+    <label>Key
+      <input id="key" type="password">
+    </label>
+    <a href="setup.html" target="_blank" style="display:block;margin-top:8px">
+      Instrucciones de configuración en Cloudflare
+    </a>
+  </fieldset>
+  <script src="popup.js"></script>
+</body>

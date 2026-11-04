@@ -1,0 +1,166 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Horas semanales: registro de la hora de llegada</title>
+<style>
+  body { max-width: 760px; margin: 24px auto; padding: 0 16px; font: 15px/1.5 sans-serif; color: #222; }
+  h1 { font-size: 24px; }
+  h2 { margin-top: 32px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  h3 { margin-top: 24px; }
+  code, pre { background: #f3f3f3; border-radius: 3px; font-family: monospace; }
+  code { padding: 1px 4px; }
+  pre { padding: 8px 12px; overflow-x: auto; }
+  table { border-collapse: collapse; margin: 8px 0; }
+  th, td { border: 1px solid #bbb; padding: 4px 10px; text-align: left; vertical-align: top; }
+  th { background: #eee; }
+  .note { background: #fff8dc; border-left: 4px solid #e0b000; padding: 6px 12px; margin: 12px 0; }
+</style>
+<body>
+<h1>Registro de la hora de llegada desde el celular</h1>
+<p>
+  El celular manda la hora a un Worker de Cloudflare y la extensión la lee al cargar el reporte. Es
+  necesario porque la VPN impide abrir el reporte desde el celular.
+</p>
+<pre>Celular → Worker de Cloudflare (KV) ← Extensión (computadora con VPN)</pre>
+<ul>
+  <li>El servidor pone la hora, así que no depende del reloj del celular.</li>
+  <li>Guarda <b>una llegada por día</b> (se borran solas a las 5 semanas).</li>
+  <li>Si ya hay una hora ese día, el servidor responde <code>exists</code> y hay que pedir sobrescribirla
+    (<code>force=1</code>).</li>
+  <li>Las marcas del celular solo aplican al <b>primer row</b>. Para rellenar el formulario de hoy debe ser
+    <b>AM</b>.</li>
+  <li>Cloudflare KV puede tardar hasta un minuto en reflejar un cambio.</li>
+</ul>
+
+<h2>Antes de empezar</h2>
+<p>
+  <b>Costo:</b> el plan gratuito de Cloudflare alcanza de sobra para este uso y no pide tarjeta. Confirma
+  los límites vigentes en la página de precios de Cloudflare.
+</p>
+<div class="note">
+  <b>Prueba la red del trabajo primero.</b> Con la VPN activa, abre en Chrome la URL del Worker cuando la
+  tengas. Si responde <code>unauthorized</code>, la red llega y todo está bien. Si no carga, la red bloquea
+  <code>workers.dev</code> y esta solución no funcionará desde esa computadora.
+</div>
+
+<h2>Parte 1: Crear el Worker en Cloudflare</h2>
+<p>
+  El código está en <a href="worker/worker.js" target="_blank">worker/worker.js</a> (dentro de la extensión).
+  Ábrelo, selecciona todo y copia.
+</p>
+<ol>
+  <li>En el panel de Cloudflare ve a <b>Workers &amp; Pages</b> → <b>Create</b>.</li>
+  <li><b>No subas archivos.</b> El cargador de archivos es el de Pages y falla con
+    <i>"This uploader does not yet support projects that require a build process"</i>.</li>
+  <li>Las plantillas destacadas (Astro, React Router, Vite React, etc.) no sirven. Busca la plantilla
+    <b>Hello World</b> entre las opciones.</li>
+  <li>Ponle el nombre <code>horas-llegada</code> y pulsa <b>Deploy</b>.</li>
+  <li>Pulsa <b>Edit code</b>, borra el código de ejemplo, pega el código copiado y pulsa <b>Deploy</b> de
+    nuevo.</li>
+</ol>
+
+<h2>Parte 2: Crear el namespace de KV y vincularlo</h2>
+<p>
+  El dropdown del binding solo deja elegir un namespace que ya existe. <b>No permite crear uno</b>, así que
+  se crea primero por separado.
+</p>
+<ol>
+  <li>Crea un namespace de KV desde la sección de almacenamiento del panel (menú
+    <b>Storage &amp; Databases</b> → <b>KV</b>, el nombre puede variar). Por ejemplo
+    <code>horas-llegada</code>.</li>
+  <li>Abre el Worker → <b>Settings</b> → <b>Bindings</b> → <b>Add</b>.</li>
+  <li>En la lista que aparece, elige <b>KV namespace</b>. La lista abre con <b>D1 database</b> seleccionado:
+    no es esa.</li>
+  <li>En <b>Variable name</b> escribe exactamente <code>ARRIVALS</code> (mayúsculas). El código usa ese
+    nombre.</li>
+  <li>Elige el namespace creado y guarda.</li>
+</ol>
+
+<h2>Parte 3: Variables y secretos</h2>
+<p>En el Worker → <b>Settings</b> → <b>Variables and Secrets</b>:</p>
+<table>
+  <tr><th>Nombre</th><th>Valor</th><th>Tipo</th></tr>
+  <tr><td><code>KEY</code></td><td>Una cadena larga y aleatoria</td><td>Secret</td></tr>
+  <tr><td><code>TZ</code></td><td>Tu zona horaria, por ejemplo <code>America/Chihuahua</code></td><td>Texto</td></tr>
+</table>
+<p>Después de agregar el binding y las variables, pulsa <b>Deploy</b> otra vez para que se apliquen.</p>
+
+<h2>Parte 4: Obtener la URL y probar</h2>
+<p>
+  La URL del Worker aparece en el <b>Overview</b>, en <b>Domains &amp; Routes</b> (el nombre puede variar).
+  Tiene la forma <code>https://horas-llegada.TU-SUBDOMINIO.workers.dev</code>. El dominio
+  <code>workers.dev</code> debe estar activado.
+</p>
+<p>Prueba desde la terminal, sustituyendo la URL y la llave:</p>
+<pre>curl -s "https://TU-URL.workers.dev/arrival?key=TU_KEY"
+curl -s -X POST "https://TU-URL.workers.dev/arrive?key=TU_KEY"
+curl -s -X POST "https://TU-URL.workers.dev/arrive?key=TU_KEY"
+curl -s "https://TU-URL.workers.dev/arrivals?key=TU_KEY"</pre>
+<table>
+  <tr><th>Respuesta</th><th>Significado</th></tr>
+  <tr><td><code>{"ts":null}</code></td><td>Todo bien. Todavía no hay hora registrada hoy.</td></tr>
+  <tr><td><code>{"status":"saved","ts":...,"time":"..."}</code></td><td>Registró la hora (primer POST).</td></tr>
+  <tr><td><code>{"status":"exists",...}</code></td><td>Ya había hora hoy (segundo POST).</td></tr>
+  <tr><td><code>{"days":{"2026-11-03":...}}</code></td><td>Historial de llegadas (lo que lee la extensión).</td></tr>
+  <tr><td><code>unauthorized</code></td><td>La <code>KEY</code> no coincide con la guardada en el Worker.</td></tr>
+  <tr><td>Error 1101 de Cloudflare</td><td>Falta el binding <code>ARRIVALS</code>, o falta desplegar.</td></tr>
+</table>
+<p>
+  Ojo: la prueba deja registrada una llegada de hoy. Se borra sola con el tiempo, y la extensión la ignora
+  si es PM.
+</p>
+
+<h2>Parte 5: Configurar la extensión</h2>
+<ol>
+  <li>Abre el popup de la extensión. En <b>Registro hora de llegada</b>, escribe la URL del Worker en
+    <b>Endpoint del celular</b> y la llave en <b>Key</b>.</li>
+  <li>Recarga el reporte. Si ya hay una hora de llegada AM registrada hoy, las listas se llenan solas.</li>
+</ol>
+
+<h2>Parte 6: Acceso directo en Android (HTTP Shortcuts)</h2>
+<p>La app gratuita se llama <b>HTTP Shortcuts</b> (Play Store). Sustituye <code>TU-URL</code> y <code>TU_KEY</code>.</p>
+<h3>Acceso 1: Llegada</h3>
+<ol>
+  <li>Pulsa <b>+</b> → crear un acceso directo <b>HTTP Shortcut</b> (Regular).</li>
+  <li><b>Nombre:</b> <code>Llegada</code>. <b>Método:</b> <code>POST</code>.</li>
+  <li><b>URL:</b> <code>https://TU-URL.workers.dev/arrive?key=TU_KEY</code></li>
+  <li>En <b>Manejo de respuesta</b>:
+    <ul>
+      <li><b>Al éxito:</b> <i>Mostrar respuesta</i>.</li>
+      <li><b>Al fracaso:</b> <i>Mostrar mensaje de error detallado</i>. Un 409 cuenta como fallo, y la versión
+        detallada incluye el cuerpo con la hora ya registrada.</li>
+    </ul>
+  </li>
+  <li>Guarda.</li>
+</ol>
+<h3>Acceso 2: Llegada (sobrescribir)</h3>
+<p>Igual, pero con la URL <code>https://TU-URL.workers.dev/arrive?key=TU_KEY&amp;force=1</code>.</p>
+<p>
+  Para la pantalla de inicio, mantén pulsado cada acceso dentro de la app y elige
+  <b>Colocar en pantalla de inicio</b>. Uso: toca <b>Llegada</b>. Si ya había hora verás <code>exists</code> con
+  la hora registrada; para corregirla, toca <b>Llegada (sobrescribir)</b>.
+</p>
+
+<h2>Parte 7: Acceso directo en iOS (Atajos)</h2>
+<div class="note">No probado. Los nombres de las acciones pueden variar según la versión de iOS.</div>
+<ol>
+  <li>Abre <b>Atajos</b>, pulsa <b>+</b> y nómbralo <code>Llegada</code>.</li>
+  <li><b>Obtener contenido de URL</b>, con la URL <code>https://TU-URL.workers.dev/arrive?key=TU_KEY</code>. En
+    <b>Mostrar más</b>, método <b>POST</b>.</li>
+  <li><b>Obtener valor del diccionario</b> para la clave <code>status</code> del resultado.</li>
+  <li><b>Obtener valor del diccionario</b> para la clave <code>time</code> del resultado.</li>
+  <li><b>Si</b> el valor de <code>status</code> <b>es</b> <code>exists</code>:
+    <ol type="a">
+      <li><b>Mostrar alerta</b>: título <code>Ya registraste a las [time]</code>, mensaje
+        <code>¿Sobrescribir con la hora actual?</code>. Si cancelas, el atajo se detiene.</li>
+      <li><b>Obtener contenido de URL</b> con <code>...&amp;force=1</code> y método <b>POST</b>.</li>
+      <li><b>Obtener valor del diccionario</b> para la clave <code>time</code> del resultado anterior.</li>
+      <li><b>Mostrar notificación</b>: <code>Llegada actualizada: [time]</code>.</li>
+    </ol>
+  </li>
+  <li><b>En el Si no</b>: <b>Mostrar notificación</b> con <code>Llegada registrada: [time]</code>.</li>
+  <li>Para la pantalla de inicio: detalles del atajo → <b>Añadir a pantalla de inicio</b>.</li>
+</ol>
+<div class="note">
+  La llave queda dentro de la URL de los accesos directos. No compartas capturas ni los exportes.
+</div>
+</body>
